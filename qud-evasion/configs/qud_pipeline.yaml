@@ -1,0 +1,32 @@
+inherit: base.yaml
+output_dir: outputs/qud
+
+# --- LLM (Stage 1 + 2 generative calls) ---
+# NOTE: Qwen3-4B-Instruct-2507 is a pure causal LM, non-thinking by default,
+# strong instruction-following — drops straight into AutoModelForCausalLM.
+# (Avoid Qwen3.5-4B: it is a multimodal VLM in thinking mode by default,
+# which pollutes JSON output and needs AutoModelForMultimodalLM.)
+llm_model: Qwen/Qwen3.5-9B
+llm_cache: outputs/llm_cache.sqlite            # shared cache across runs
+
+# tensor_parallel / max_model_len are inert under the transformers backend
+# (kept for config compatibility; device_map="auto" handles sharding).
+tensor_parallel: 2
+max_model_len: 8192
+temperature: 0.0
+max_tokens: 512
+
+# Stage 1
+max_quds: 3
+use_commitment_features: false
+
+# Stage 2
+use_embedding_features: true
+use_nli_features: true
+embedding_model: sentence-transformers/all-mpnet-base-v2
+# Lighter NLI head than DeBERTa-v3-large; still a real 3-way (ent/neutral/contra)
+# classifier, which the QUD-relation mapping needs.
+nli_model: MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli
+
+# Stage 3: "rule" (zero-parameter taxonomy rules) or "learned" (HGB head)
+head: rule

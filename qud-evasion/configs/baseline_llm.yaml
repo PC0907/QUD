@@ -1,0 +1,10 @@
+inherit: base.yaml
+output_dir: outputs/llm_baseline
+llm_model: Qwen/Qwen3-4B-Instruct-2507
+llm_cache: outputs/llm_cache.sqlite
+tensor_parallel: 4          # match your GPU count
+max_model_len: 8192
+temperature: 0.0
+max_tokens: 512
+few_shot: true
+k_per_class: 1

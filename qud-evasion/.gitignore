@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+data/processed/
+outputs/*
+!outputs/.gitkeep
+*.sqlite
+.ipynb_checkpoints/
+wandb/
+logs/
+.hf_cache/
+outputs/

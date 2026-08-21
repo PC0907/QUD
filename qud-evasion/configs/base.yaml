@@ -1,0 +1,5 @@
+# Shared settings inherited by all experiment configs.
+seed: 13
+data_dir: data/processed
+hf_cache_dir: null          # set to a scratch path on the GPU server
+dev_fraction: 0.10          # internal dev carved out of official train
