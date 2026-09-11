@@ -21,7 +21,7 @@ unset SLURM_EXPORT_ENV
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 source "$ROOT/scripts/_env.sh"
 
-CONCEPTS="${CONCEPTS:-v0}"
+CONCEPTS="${1:-v0}"
 MODEL="${MODEL:-Qwen/Qwen3-4B-Instruct-2507}"
 OUT="outputs/cbm/${CONCEPTS}"
 mkdir -p "$OUT"
