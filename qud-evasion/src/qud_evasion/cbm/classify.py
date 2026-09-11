@@ -127,14 +127,16 @@ def counterfactual_consistency(clf: ConceptClassifier, X: pd.DataFrame,
     implies? Reports, per concept, the share of changed predictions that
     land in the label(s) the concept is supposed to indicate."""
     expected = {
-        "c1": {"Explicit"},
-        "c2": {"Implicit"},
-        "c3": {"Partial/half-answer"},
-        "c4": {"General"},
-        "c5": {"Deflection", "Dodging"},
-        "c6": {"Declining to answer", "Claims ignorance", "Clarification"},
-        "c7": {"Deflection"},
-        "c8": {"Deflection", "Dodging", "Partial/half-answer"},
+        "p1": {"Explicit", "Implicit"},
+        "p2": {"Explicit"},
+        "p3": {"General"},
+        "p4": {"Partial/half-answer"},
+        "p5": {"Explicit", "Implicit", "General", "Partial/half-answer", "Deflection"},
+        "p6": {"Deflection"},
+        "p7": {"Declining to answer"},
+        "p8": {"Claims ignorance"},
+        "p9": {"Clarification"},
+        "p10": {"Dodging", "Deflection", "Partial/half-answer"},
     }
     base = clf.predict(X)["evasion_pred"].to_numpy()
     rows = []

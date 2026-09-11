@@ -73,10 +73,78 @@ V0: list[Concept] = [
     ),
 ]
 
+V1: list[Concept] = [
+    Concept(
+        "p0", "malformed_subquestion",
+        "Is the TARGET sub-question malformed, that is, not a coherent "
+        "question that could be answered (for example a fragment, a "
+        "nominalization, or something not actually asked in the turn)? "
+        "Answer \"yes\" only if the sub-question itself is unusable.",
+    ),
+    Concept(
+        "p1", "information_present",
+        "Does the answer provide the information the TARGET sub-question "
+        "asks for, whether stated directly or left to be inferred by the "
+        "listener?",
+    ),
+    Concept(
+        "p2", "requested_form",
+        "Is that information stated explicitly, in the form the question "
+        "asks for (a yes/no question gets a yes or no, a when-question gets "
+        "a time, a who-question gets a name)? Answer \"no\" if the "
+        "information can only be inferred.",
+    ),
+    Concept(
+        "p3", "lacks_specificity",
+        "Is what the answer provides too general, or lacking the specificity "
+        "the TARGET sub-question asks for?",
+    ),
+    Concept(
+        "p4", "only_one_component",
+        "Does the answer address only one component or facet of what the "
+        "TARGET sub-question requested, leaving other requested parts "
+        "unaddressed?",
+    ),
+    Concept(
+        "p5", "engages_topic",
+        "Does the answer engage with the topic of the TARGET sub-question at "
+        "all, even if it does not answer it? Answer \"no\" if the answer "
+        "ignores the sub-question altogether and talks about something else.",
+    ),
+    Concept(
+        "p6", "shifts_focus",
+        "Does the answer start on the topic of the TARGET sub-question but "
+        "then shift focus and make a different point from the one asked "
+        "about?",
+    ),
+    Concept(
+        "p7", "refuses",
+        "Does the speaker acknowledge the TARGET sub-question and then "
+        "directly or indirectly refuse to answer it at this time?",
+    ),
+    Concept(
+        "p8", "claims_ignorance",
+        "Does the speaker claim or admit that they themselves do not know "
+        "the answer to the TARGET sub-question?",
+    ),
+    Concept(
+        "p9", "asks_clarification",
+        "Does the speaker withhold the requested information and instead ask "
+        "the interviewer for clarification about the TARGET sub-question?",
+    ),
+    Concept(
+        "p10", "addresses_sibling",
+        "Does the answer address a DIFFERENT numbered sub-question from this "
+        "same turn instead of the TARGET? If yes, give the number of that "
+        "sub-question in \"which\".",
+        turn_aware=True, has_which=True,
+    ),
+]
+
 CONCEPT_SETS: dict[str, list[Concept]] = {
     "v0": V0,
+    "v1": V1,
 }
-
 
 def get_concepts(version: str = "v0") -> list[Concept]:
     try:
