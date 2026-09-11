@@ -68,43 +68,130 @@ def _make_client(cfg: dict):
 # subcommands
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Replace the two existing functions in src/qud_evasion/cli.py with these.
+# Nothing else in cli.py changes.
+# ---------------------------------------------------------------------------
+
+
 def cmd_prepare_data(cfg: dict, args) -> None:
     from .data.load import load_qevasion, save_processed
-    from .data.splits import interview_level_split
+    from .data.splits import interview_level_split, three_way_split
 
     dfs = load_qevasion(cache_dir=cfg.get("hf_cache_dir"))
-    train, dev = interview_level_split(
-        dfs["train"],
-        dev_fraction=cfg.get("dev_fraction", 0.10),
-        seed=cfg.get("seed", 13),
-    )
-    save_processed(
-        {"train": train, "dev": dev, "official_test": dfs["official_test"]},
-        cfg["data_dir"],
-    )
+    val_fraction = cfg.get("val_fraction", 0.10)
+
+    if val_fraction and val_fraction > 0:
+        train, val, dev = three_way_split(
+            dfs["train"],
+            dev_fraction=cfg.get("dev_fraction", 0.10),
+            val_fraction=val_fraction,
+            seed=cfg.get("seed", 13),
+        )
+        splits = {"train": train, "val": val, "dev": dev,
+                  "official_test": dfs["official_test"]}
+    else:
+        train, dev = interview_level_split(
+            dfs["train"],
+            dev_fraction=cfg.get("dev_fraction", 0.10),
+            seed=cfg.get("seed", 13),
+        )
+        splits = {"train": train, "dev": dev, "official_test": dfs["official_test"]}
+
+    save_processed(splits, cfg["data_dir"])
 
 
 def cmd_train_encoder(cfg: dict, args) -> None:
+    import numpy as np
+
     from .baselines.encoder import train_encoder
     from .eval.metrics import save_metrics
+    from .eval.stratified import disagreement_profile, stratified_report
 
     train = _load_split(cfg, "train")
     dev = _load_split(cfg, "dev")
+
+    # Validation split for epoch selection. Absent -> selection is disabled
+    # rather than silently falling back to dev, which is what leaked before.
+    try:
+        val = _load_split(cfg, "val")
+    except SystemExit:
+        val = None
+        logger.warning(
+            "No 'val' split found: epoch selection disabled, reporting the "
+            "final epoch. Re-run prepare-data with val_fraction set to enable it."
+        )
+
+    test = None
+    if cfg.get("evaluate_test", False):
+        test = _load_split(cfg, "official_test")
+
+    seeds = cfg.get("seeds") or [cfg.get("seed", 13)]
     for target in cfg.get("targets", ["evasion", "clarity"]):
         out_dir = Path(cfg["output_dir"]) / target
-        result = train_encoder(
-            train, dev,
-            target=target,
-            model_name=cfg.get("encoder_model", "microsoft/deberta-v3-base"),
-            output_dir=out_dir,
-            max_length=cfg.get("max_length", 512),
-            lr=cfg.get("lr", 1e-5),
-            epochs=cfg.get("epochs", 5),
-            batch_size=cfg.get("batch_size", 8),
-            grad_accum=cfg.get("grad_accum", 4),
-            seed=cfg.get("seed", 13),
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        runs, dev_f1, test_f1 = [], [], []
+        for seed in seeds:
+            result = train_encoder(
+                train, dev,
+                val_df=val,
+                test_df=test,
+                target=target,
+                model_name=cfg.get("encoder_model", "microsoft/deberta-v3-base"),
+                output_dir=out_dir / f"seed{seed}",
+                max_length=cfg.get("max_length", 512),
+                lr=cfg.get("lr", 1e-5),
+                epochs=cfg.get("epochs", 10),
+                batch_size=cfg.get("batch_size", 8),
+                grad_accum=cfg.get("grad_accum", 4),
+                seed=seed,
+                save_best=cfg.get("save_best", False),
+            )
+            dev_f1.append(result["dev"]["metrics"]["macro_f1"])
+            if test is not None and "metrics" in result.get("test", {}):
+                test_f1.append(result["test"]["metrics"]["macro_f1"])
+
+            # Per-seed record, minus the prediction lists (kept separately).
+            runs.append({
+                "seed": seed,
+                "dev": result["dev"]["metrics"],
+                "val": result.get("val", {}).get("metrics"),
+                "test": result.get("test", {}).get("metrics"),
+            })
+
+            # Stratified test report from the first seed only: the strata are
+            # small (125 / 150 / 33) and averaging them across seeds would
+            # suggest more precision than 33 rows can support.
+            if test is not None and seed == seeds[0] and "predictions" in result.get("test", {}):
+                label_col = "clarity_label" if target == "clarity" else "evasion_label"
+                strat = stratified_report(test, result["test"]["predictions"], label_col)
+                strat.to_csv(out_dir / "test_stratified.csv", index=False)
+                logger.info("test, stratified by annotator agreement:\n%s",
+                            strat.to_string(index=False))
+                disagreement_profile(test, label_col).to_csv(
+                    out_dir / "test_disagreement_profile.csv")
+
+        summary = {
+            "target": target,
+            "seeds": list(seeds),
+            "selection": "val" if val is not None else "final epoch (no selection)",
+            "dev_macro_f1_mean": float(np.mean(dev_f1)),
+            "dev_macro_f1_std": float(np.std(dev_f1)),
+            "runs": runs,
+        }
+        if test_f1:
+            summary["test_macro_f1_mean"] = float(np.mean(test_f1))
+            summary["test_macro_f1_std"] = float(np.std(test_f1))
+
+        save_metrics(summary, out_dir / "metrics.json")
+        logger.info(
+            "%s: dev macro-F1 %.4f +/- %.4f over %d seed(s)%s",
+            target, summary["dev_macro_f1_mean"], summary["dev_macro_f1_std"],
+            len(seeds),
+            (" | test %.4f +/- %.4f" % (summary["test_macro_f1_mean"],
+                                        summary["test_macro_f1_std"])) if test_f1 else "",
         )
-        save_metrics(result["metrics"], out_dir / "dev_metrics.json")
 
 
 def cmd_llm_baseline(cfg: dict, args) -> None:

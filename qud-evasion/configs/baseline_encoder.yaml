@@ -7,3 +7,19 @@ lr: 1.0e-5
 epochs: 10
 batch_size: 8
 grad_accum: 4
+
+# Epoch selection happens on `val`, reporting on `dev`. Selecting and
+# reporting on the same split makes the reported number a maximum over
+# epochs rather than an estimate.
+val_fraction: 0.10
+
+# Multi-seed: single-split point estimates on 346 dev rows are not
+# separable from noise, so every reported number needs a spread.
+seeds: [13, 17, 23, 29, 31]
+
+# The official test split ships without fine-grained evasion gold, so
+# only the clarity target produces a test number.
+evaluate_test: true
+
+# Checkpoints are ~1.5 GB each and we only need the metrics.
+save_best: false
