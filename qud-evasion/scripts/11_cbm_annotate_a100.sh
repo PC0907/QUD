@@ -13,10 +13,9 @@
 # Stage A of the concept bottleneck, on the AMD A100 nodes.
 # Identical to 10_cbm_annotate.sh except for the partition and the env file.
 # Submit from the repo root:  sbatch scripts/11_cbm_annotate_a100.sh v1
-set -euo pipefail
-
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 source "$ROOT/scripts/_env_a100.sh"
+set -euo pipefail
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 CONCEPTS="${1:-v0}"
