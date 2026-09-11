@@ -36,8 +36,9 @@ for split in dev train; do
         --out  "${OUT}/${split}.jsonl" \
         --model "$MODEL" \
         --concepts "$CONCEPTS" \
-        --max-tokens 768 \
-        --batch-size 8
+        --max-tokens 1024 \
+        --batch-size 24
 done
 
 echo "done. next: python scripts/cbm_train.py --concepts ${CONCEPTS} --head lr"
+
