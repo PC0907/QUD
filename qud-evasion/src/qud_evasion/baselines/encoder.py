@@ -54,7 +54,8 @@ class WeightedTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         labels = inputs.pop("labels")
         outputs = model(**inputs)
-        weights = self.class_weights.to(outputs.logits.device)
+        weights = self.class_weights.to(device=outputs.logits.device,
+                                        dtype=outputs.logits.dtype)
         loss = torch.nn.functional.cross_entropy(outputs.logits, labels, weight=weights)
         return (loss, outputs) if return_outputs else loss
 
@@ -101,6 +102,7 @@ def train_encoder(
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name, num_labels=len(labels),
         id2label={v: k for k, v in label2id.items()}, label2id=label2id,
+        dtype=torch.float32,
     )
 
     raw_weights = compute_class_weight(
