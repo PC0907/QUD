@@ -29,7 +29,7 @@ mkdir -p "$OUT"
 nvidia-smi --query-gpu=name,memory.total --format=csv
 python -c "import torch; print('cuda:', torch.cuda.is_available())"
 
-for split in dev train; do
+for split in dev train official_test; do
     echo "=== annotating ${split} with ${CONCEPTS} / ${MODEL} ==="
     python -m qud_evasion.cbm.annotate \
         --data "data/processed/${split}.parquet" \

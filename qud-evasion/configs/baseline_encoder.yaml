@@ -4,7 +4,7 @@ encoder_model: microsoft/deberta-v3-base
 targets: [evasion, clarity]
 max_length: 512
 lr: 3.0e-5
-seeds: [13]
+seeds: [13, 17, 23, 29, 31]
 epochs: 20
 batch_size: 8
 grad_accum: 4

@@ -1,0 +1,6 @@
+inherit: baseline_encoder.yaml
+output_dir: outputs/encoder_large
+encoder_model: microsoft/deberta-v3-large
+batch_size: 4
+grad_accum: 8
+lr: 1.0e-5
