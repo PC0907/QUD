@@ -5,7 +5,7 @@ targets: [evasion, clarity]
 max_length: 512
 lr: 3.0e-5
 seeds: [13]
-epochs: 10
+epochs: 20
 batch_size: 8
 grad_accum: 4
 
