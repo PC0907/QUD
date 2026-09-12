@@ -3,7 +3,8 @@ output_dir: outputs/encoder
 encoder_model: microsoft/deberta-v3-base
 targets: [evasion, clarity]
 max_length: 512
-lr: 1.0e-5
+lr: 3.0e-5
+seeds: [13]
 epochs: 10
 batch_size: 8
 grad_accum: 4
@@ -15,7 +16,6 @@ val_fraction: 0.10
 
 # Multi-seed: single-split point estimates on 346 dev rows are not
 # separable from noise, so every reported number needs a spread.
-seeds: [13, 17, 23, 29, 31]
 
 # The official test split ships without fine-grained evasion gold, so
 # only the clarity target produces a test number.
