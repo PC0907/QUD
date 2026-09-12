@@ -32,7 +32,7 @@ python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is
 python -c "import qud_evasion, os; print('pkg', os.path.dirname(qud_evasion.__file__))"
 echo "=== environment OK ==="
 
-for split in dev train; do
+for split in dev train official_test; do
     echo "=== annotating ${split} with ${CONCEPTS} / ${MODEL} ==="
     python -m qud_evasion.cbm.annotate \
         --data "data/processed/${split}.parquet" \
