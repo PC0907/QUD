@@ -30,3 +30,5 @@ python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is
 echo "=== environment OK ==="
 
 python -m qud_evasion.cli train-encoder --config configs/baseline_encoder.yaml
+
+rm -rf outputs/encoder*/*/seed*/checkpoint-* 2>/dev/null || true

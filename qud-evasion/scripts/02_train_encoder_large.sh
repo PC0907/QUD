@@ -16,3 +16,5 @@ set -euo pipefail
 
 nvidia-smi --query-gpu=name,memory.total --format=csv || true
 python -m qud_evasion.cli train-encoder --config configs/baseline_encoder_large.yaml
+
+rm -rf outputs/encoder*/*/seed*/checkpoint-* 2>/dev/null || true

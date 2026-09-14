@@ -167,6 +167,10 @@ def cmd_train_encoder(cfg: dict, args) -> None:
                 label_col = "clarity_label" if target == "clarity" else "evasion_label"
                 strat = stratified_report(test, result["test"]["predictions"], label_col)
                 strat.to_csv(out_dir / "test_stratified.csv", index=False)
+                pd.DataFrame({
+                    "example_id": test["example_id"].values,
+                    "clarity_pred": result["test"]["predictions"],
+                }).to_csv(out_dir / "test_predictions.csv", index=False)
                 logger.info("test, stratified by annotator agreement:\n%s",
                             strat.to_string(index=False))
                 disagreement_profile(test, label_col).to_csv(
