@@ -83,6 +83,11 @@ def main() -> None:
                     help="layer for causal tests; default = best missed-row layer")
     ap.add_argument("--alpha", type=float, default=1.0,
                     help="addition strength, in units of the yes/no mean gap")
+    ap.add_argument("--ablate-all-layers", action="store_true",
+                    help="project the direction out of EVERY layer (Arditi et al. "
+                         "2024), so later layers cannot rebuild it from context")
+    ap.add_argument("--alphas", type=float, nargs="*", default=None,
+                    help="dose-response sweep for addition, e.g. 1 2 4 8")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -234,7 +239,8 @@ def main() -> None:
     u = d / d.norm()
     r = torch.randn_like(u.float())
     r = (r / r.norm()).to(torch.bfloat16)
-    log.info("causal tests at layer %d (hook on decoder block %d)", L, L - 1)
+    log.info("causal tests at layer %d (hook on decoder block %d)%s", L, L - 1,
+             "; ablation applied at ALL layers" if args.ablate_all_layers else "")
 
     def hook_factory(vec, mode, alpha=1.0):
         def hook(module, inputs, output):
@@ -244,7 +250,19 @@ def main() -> None:
             else:
                 h = h + alpha * vec
             return (h,) + tuple(output[1:]) if isinstance(output, tuple) else h
-        return lambda: layers[L - 1].register_forward_hook(hook)
+
+        targets = (list(layers) if (mode == "ablate" and args.ablate_all_layers)
+                   else [layers[L - 1]])
+
+        def register():
+            handles = [t.register_forward_hook(hook) for t in targets]
+
+            class _Handles:
+                def remove(self):
+                    for hd in handles:
+                        hd.remove()
+            return _Handles()
+        return register
 
     def causal(frame, base_diffs, factory, flip_to):
         new = np.array([run(build_text(rec), hook=factory)[0]
@@ -270,6 +288,30 @@ def main() -> None:
     if len(missed):
         results["add_direction_on_missed"] = causal(
             missed, F["missed"][1], hook_factory(d, "add", args.alpha), "yes")
+
+    # Dose-response: at margins of ~20 logits a flip is a harsh criterion; the
+    # informative quantity is whether the logit shift grows with strength and
+    # stays above the random-direction control at every dose.
+    if args.alphas:
+        sweep = []
+        for a in args.alphas:
+            on_dir = causal(no_eval, F["no_eval"][1], hook_factory(d, "add", a), "yes")
+            on_rnd = causal(no_eval, F["no_eval"][1],
+                            hook_factory(r * d.norm(), "add", a), "yes")
+            row = {"alpha": a,
+                   "shift_direction": on_dir["mean_diff_after"] - on_dir["mean_diff_before"],
+                   "shift_random": on_rnd["mean_diff_after"] - on_rnd["mean_diff_before"],
+                   "flip_direction": on_dir["flip_rate"],
+                   "flip_random": on_rnd["flip_rate"]}
+            if len(missed):
+                on_mis = causal(missed, F["missed"][1], hook_factory(d, "add", a), "yes")
+                row["shift_missed"] = on_mis["mean_diff_after"] - on_mis["mean_diff_before"]
+                row["flip_missed"] = on_mis["flip_rate"]
+            sweep.append(row)
+        results["dose_response_on_no"] = sweep
+        log.info("dose-response (logit shift toward yes):\n%s",
+                 pd.DataFrame(sweep).to_string(index=False,
+                                               float_format=lambda v: f"{v:.2f}"))
 
     (out_dir / "causal.json").write_text(json.dumps(results, indent=2))
     torch.save({L: torch.tensor(dirs[L][0]) for L in dirs}, out_dir / "directions.pt")
