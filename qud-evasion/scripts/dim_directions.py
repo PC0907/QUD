@@ -91,6 +91,8 @@ def main() -> None:
                          "before the decision forms; brackets --ablate-all-layers")
     ap.add_argument("--alphas", type=float, nargs="*", default=None,
                     help="dose-response sweep for addition, e.g. 1 2 4 8")
+    ap.add_argument("--n-random", type=int, default=5,
+                    help="number of seeded random directions averaged for each control")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
@@ -240,8 +242,13 @@ def main() -> None:
     d_np, _ = dirs[L]
     d = torch.tensor(d_np, dtype=torch.bfloat16, device=model.device)
     u = d / d.norm()
-    r = torch.randn_like(u.float())
-    r = (r / r.norm()).to(torch.bfloat16)
+    # Several SEEDED random directions: a single random vector proved a very
+    # noisy control (different draws flipped 1% vs 48% at the same dose).
+    gen = torch.Generator().manual_seed(args.seed)
+    rands = []
+    for _ in range(args.n_random):
+        v = torch.randn(u.shape[0], generator=gen)
+        rands.append((v / v.norm()).to(device=model.device, dtype=torch.bfloat16))
     log.info("causal tests at layer %d (hook on decoder block %d)%s", L, L - 1,
              "; ablation applied at ALL layers" if args.ablate_all_layers
              else f"; ablation applied at layers 1-{args.ablate_upto}" if args.ablate_upto
@@ -284,16 +291,30 @@ def main() -> None:
                 "mean_diff_before": float(base_diffs.mean()) if len(new) else float("nan"),
                 "mean_diff_after": float(new.mean()) if len(new) else float("nan")}
 
+    def causal_random(frame, base_diffs, mode, flip_to, alpha=1.0):
+        """Average a control over all seeded random directions; report the
+        spread of flip rates so a single lucky or unlucky draw is visible."""
+        runs = []
+        for v in rands:
+            vec = v if mode == "ablate" else v * d.norm()
+            runs.append(causal(frame, base_diffs, hook_factory(vec, mode, alpha), flip_to))
+        flips = [r_["flip_rate"] for r_ in runs]
+        return {"n": runs[0]["n"], "n_random": len(runs),
+                "flip_rate": float(np.mean(flips)),
+                "flip_rate_min": float(np.min(flips)), "flip_rate_max": float(np.max(flips)),
+                "mean_diff_before": runs[0]["mean_diff_before"],
+                "mean_diff_after": float(np.mean([r_["mean_diff_after"] for r_ in runs]))}
+
     results = {"concept": cid, "layer": L, "alpha": args.alpha,
                "sanity_agree_yes": agree_yes, "sanity_agree_no": agree_no}
     results["ablate_direction_on_yes"] = causal(
         yes_eval, F["yes_eval"][1], hook_factory(u, "ablate"), "no")
-    results["ablate_random_on_yes"] = causal(
-        yes_eval, F["yes_eval"][1], hook_factory(r, "ablate"), "no")
+    results["ablate_random_on_yes"] = causal_random(
+        yes_eval, F["yes_eval"][1], "ablate", "no")
     results["add_direction_on_no"] = causal(
         no_eval, F["no_eval"][1], hook_factory(d, "add", args.alpha), "yes")
-    results["add_random_on_no"] = causal(
-        no_eval, F["no_eval"][1], hook_factory(r * d.norm(), "add", args.alpha), "yes")
+    results["add_random_on_no"] = causal_random(
+        no_eval, F["no_eval"][1], "add", "yes", args.alpha)
     if len(missed):
         results["add_direction_on_missed"] = causal(
             missed, F["missed"][1], hook_factory(d, "add", args.alpha), "yes")
@@ -305,13 +326,13 @@ def main() -> None:
         sweep = []
         for a in args.alphas:
             on_dir = causal(no_eval, F["no_eval"][1], hook_factory(d, "add", a), "yes")
-            on_rnd = causal(no_eval, F["no_eval"][1],
-                            hook_factory(r * d.norm(), "add", a), "yes")
+            on_rnd = causal_random(no_eval, F["no_eval"][1], "add", "yes", a)
             row = {"alpha": a,
                    "shift_direction": on_dir["mean_diff_after"] - on_dir["mean_diff_before"],
                    "shift_random": on_rnd["mean_diff_after"] - on_rnd["mean_diff_before"],
                    "flip_direction": on_dir["flip_rate"],
-                   "flip_random": on_rnd["flip_rate"]}
+                   "flip_random": on_rnd["flip_rate"],
+                   "flip_random_range": f'{on_rnd["flip_rate_min"]:.2f}-{on_rnd["flip_rate_max"]:.2f}'}
             if len(missed):
                 on_mis = causal(missed, F["missed"][1], hook_factory(d, "add", a), "yes")
                 row["shift_missed"] = on_mis["mean_diff_after"] - on_mis["mean_diff_before"]
