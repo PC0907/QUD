@@ -22,4 +22,5 @@ nvidia-smi --query-gpu=name,memory.total --format=csv || true
 python scripts/justification_faithfulness.py \
     --concepts "$CONCEPTS" \
     --max-per-concept 60 \
-    --batch-size 16
+    --batch-size 16 \
+    "${@:2}"
