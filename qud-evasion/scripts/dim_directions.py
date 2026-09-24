@@ -86,6 +86,9 @@ def main() -> None:
     ap.add_argument("--ablate-all-layers", action="store_true",
                     help="project the direction out of EVERY layer (Arditi et al. "
                          "2024), so later layers cannot rebuild it from context")
+    ap.add_argument("--ablate-upto", type=int, default=None,
+                    help="project the direction out of layers 1..N only, i.e. "
+                         "before the decision forms; brackets --ablate-all-layers")
     ap.add_argument("--alphas", type=float, nargs="*", default=None,
                     help="dose-response sweep for addition, e.g. 1 2 4 8")
     ap.add_argument("--seed", type=int, default=13)
@@ -240,7 +243,9 @@ def main() -> None:
     r = torch.randn_like(u.float())
     r = (r / r.norm()).to(torch.bfloat16)
     log.info("causal tests at layer %d (hook on decoder block %d)%s", L, L - 1,
-             "; ablation applied at ALL layers" if args.ablate_all_layers else "")
+             "; ablation applied at ALL layers" if args.ablate_all_layers
+             else f"; ablation applied at layers 1-{args.ablate_upto}" if args.ablate_upto
+             else "")
 
     def hook_factory(vec, mode, alpha=1.0):
         def hook(module, inputs, output):
@@ -251,8 +256,12 @@ def main() -> None:
                 h = h + alpha * vec
             return (h,) + tuple(output[1:]) if isinstance(output, tuple) else h
 
-        targets = (list(layers) if (mode == "ablate" and args.ablate_all_layers)
-                   else [layers[L - 1]])
+        if mode == "ablate" and args.ablate_all_layers:
+            targets = list(layers)
+        elif mode == "ablate" and args.ablate_upto:
+            targets = list(layers[: args.ablate_upto])   # blocks 0..N-1 = layers 1..N
+        else:
+            targets = [layers[L - 1]]
 
         def register():
             handles = [t.register_forward_hook(hook) for t in targets]
