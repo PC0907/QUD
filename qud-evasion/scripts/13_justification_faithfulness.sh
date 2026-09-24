@@ -17,7 +17,10 @@
 # The concept set must already be annotated (outputs/cbm/<set>/dev.jsonl).
 
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-source "$ROOT/scripts/_env.sh"
+case "$(hostname)" in
+  node-05|node-06) source "$ROOT/scripts/_env_a100.sh" ;;   # AMD nodes
+  *)               source "$ROOT/scripts/_env.sh" ;;        # Intel A40 nodes
+esac
 set -euo pipefail
 
 CONCEPTS="${1:-v1}"
