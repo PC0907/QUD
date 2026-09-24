@@ -1,26 +1,17 @@
 #!/bin/bash
-#SBATCH --partition=A40short
+#SBATCH --partition=A100short
 #SBATCH --time=6:00:00
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=48G
-#SBATCH --job-name=cbm-faithfulness
+#SBATCH --mem=64G
+#SBATCH --job-name=cbm-faithfulness-a100
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --export=NONE
-#
-# Justification faithfulness on the dev split: for each concept answered
-# "yes", delete the span its justification cites (vs a control sentence) and
-# re-annotate. Submit from the repo root:
-#   sbatch scripts/13_justification_faithfulness.sh v1
-# The concept set must already be annotated (outputs/cbm/<set>/dev.jsonl).
 
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-case "$(hostname)" in
-  node-05|node-06) source "$ROOT/scripts/_env_a100.sh" ;;   # AMD nodes
-  *)               source "$ROOT/scripts/_env.sh" ;;        # Intel A40 nodes
-esac
+source "$ROOT/scripts/_env_a100.sh"
 set -euo pipefail
 
 CONCEPTS="${1:-v1}"
